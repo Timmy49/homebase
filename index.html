@@ -3,298 +3,1046 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Web Hub — Wordle · Globle · JSON‑RPC Viewer</title>
-  <meta name="description" content="A simple, single‑page dashboard that puts multiple web features side‑by‑side: NYT Wordle, Globle, and a JSON‑RPC viewer with URL/paste/upload options." />
+  <title>Daily Hub — Wordle · Globle · Daily Gazette</title>
+  <meta name="description" content="A modern dashboard for daily games and news: NYT Wordle, Globle, and automated daily gazette fetching with enhanced UI." />
   <style>
     :root {
-      --bg: #0b0f17; --card: #121826; --muted: #8aa0b5; --text: #e7eef7; --accent: #4f80ff; --bad: #ff6b6b; --good: #19c37d; --warn: #ffb020;
+      --bg: #0a0e1a; --card: #1a1f2e; --muted: #94a3b8; --text: #f1f5f9; --accent: #3b82f6; --success: #10b981; --warning: #f59e0b; --error: #ef4444;
+      --border: #334155; --hover: #475569;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
-    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-           background: radial-gradient(1000px 500px at 10% -10%, #12203a 0%, var(--bg) 50%) fixed,
-                       radial-gradient(1000px 500px at 110% 10%, #0f1a30 0%, var(--bg) 50%) fixed;
-           color: var(--text);
+    body {
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: var(--text);
+      line-height: 1.6;
     }
-    header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(1.2) blur(8px); background: color-mix(in oklab, var(--bg) 85%, transparent); border-bottom: 1px solid #1f2a44; }
-    h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
-    .hint { color: var(--muted); font-size: 12px; }
-    .container { padding: 16px; max-width: 1400px; margin: 0 auto; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
-    .card { background: linear-gradient(180deg, color-mix(in oklab, var(--card) 92%, transparent), var(--card));
-            border: 1px solid #1f2a44; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.35); overflow: clip; min-height: 420px; display: flex; flex-direction: column; }
-    .card header { position: relative; inset: auto; background: transparent; border: 0; padding: 14px 16px; gap: 10px; }
-    .card .title { font-weight: 650; }
-    .card .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .btn { --b: #2a3b68; background: linear-gradient(180deg,#1a2340,#141b31); color: var(--text); border: 1px solid var(--b); border-radius: 10px; height: 34px; padding: 0 12px; font-size: 13px; cursor: pointer; transition: .2s ease;
-           display: inline-flex; align-items: center; gap: 8px; }
-    .btn:hover { filter: brightness(1.1); }
-    .btn.secondary { background: transparent; border-color: #2a3b68; }
-    .btn.good { border-color: color-mix(in oklab, var(--good) 60%, #2a3b68); }
-    .btn.warn { border-color: color-mix(in oklab, var(--warn) 60%, #2a3b68); }
-    .status { font-size: 12px; color: var(--muted); margin-left: auto; }
-    iframe.app { width: 100%; height: min(75vh, 900px); background: #0b0f17; border: 0; border-top: 1px solid #1f2a44; }
-    .fallback { padding: 14px 16px; border-top: 1px dashed #2b3b63; font-size: 14px; color: var(--muted); display: none; }
-    .card.err .fallback { display: block; }
-
-    /* JSON panel */
-    .rpc-wrap { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; padding: 12px 16px 16px; border-top: 1px solid #1f2a44; }
-    .rpc-pane { background: #0e1526; border: 1px solid #213059; border-radius: 12px; min-height: 260px; padding: 10px; overflow: auto; }
-    .rpc-toolbar { display: flex; gap: 8px; margin: 0 16px 12px; flex-wrap: wrap; }
-    input[type="url"], input[type="text"], textarea { width: 100%; background: #0d1424; color: var(--text); border: 1px solid #24345f; border-radius: 10px; padding: 8px 10px; font-size: 13px; }
-    textarea { min-height: 110px; resize: vertical; }
-    .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 10px; font-size: 13px; }
-    .kv div:nth-child(odd) { color: var(--muted); }
-    .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 8px; border: 1px solid #213059; border-radius: 999px; color: var(--muted); }
-    .foot { padding: 14px 16px; font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #1f2a44; }
-    .links a { color: var(--accent); text-decoration: none; }
-
-    @media (max-width: 1100px) { .rpc-wrap { grid-template-columns: 1fr; } }
-    @media (max-width: 920px)  { .grid { grid-template-columns: repeat(6, 1fr);} }
-    @media (max-width: 620px)  { .grid { grid-template-columns: repeat(1, 1fr);} }
+    
+    /* Header */
+    .header {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+    
+    /* Main Layout */
+    .main-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      min-height: calc(100vh - 80px);
+    }
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 2rem;
+      height: 100%;
+    }
+    
+    /* Cards */
+    .game-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      min-height: 600px;
+    }
+    .game-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+    
+    .gazette-card {
+      grid-column: 1 / -1;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      min-height: 500px;
+    }
+    
+    .card-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(59, 130, 246, 0.05);
+    }
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .card-subtitle {
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    
+    .card-controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .btn-primary:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover {
+      background: var(--hover);
+      color: var(--text);
+    }
+    
+    /* Game Frames */
+    .game-frame {
+      flex: 1;
+      width: 100%;
+      border: none;
+      background: var(--bg);
+      min-height: 500px;
+    }
+    
+    .fallback-message {
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px dashed #ef4444;
+      margin: 1rem;
+      border-radius: 0.5rem;
+      display: none;
+    }
+    .card.error .fallback-message {
+      display: block;
+    }
+    
+    /* Gazette Content */
+    .gazette-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    .gazette-toolbar {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .gazette-viewer {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      padding: 1rem;
+    }
+    .gazette-panel {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.875rem;
+      background: rgba(59, 130, 246, 0.1);
+    }
+    .panel-content {
+      flex: 1;
+      padding: 1rem;
+      overflow: auto;
+      max-height: 400px;
+    }
+    
+    .gazette-html-viewer {
+      grid-column: 1 / -1;
+      margin-top: 1rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    .gazette-html-content {
+      width: 100%;
+      height: 500px;
+      border: none;
+      background: white;
+    }
+    
+    /* Loading States */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-top: 2px solid var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 0.5rem;
+    }
+    
+    /* Status Badge */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .status-success {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .status-error {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .status-loading {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--accent);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    
+    /* Input Fields */
+    .input-field {
+      flex: 1;
+      padding: 0.75rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+    .input-field:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+      .gazette-viewer {
+        grid-template-columns: 1fr;
+      }
+      .main-container {
+        padding: 1rem;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        gap: 1rem;
+      }
+      .card-controls {
+        flex-direction: column;
+      }
+      .gazette-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+    
+    /* Animations */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--hover);
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Web Hub</h1>
-    <div class="hint">A tidy, side‑by‑side hub for a few daily web things.</div>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">Daily Hub</div>
+      <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>Live Dashboard</span>
+      </div>
+    </div>
   </header>
 
-  <main class="container">
-    <section class="grid">
-      <!-- Wordle card -->
-      <article class="card" id="card-wordle">
-        <header>
-          <div class="title">NYT Wordle</div>
-          <div class="controls">
-            <button class="btn" onclick="openExternal('https://www.nytimes.com/games/wordle/index.html')">Open in new tab</button>
-            <span class="pill">Embeds may be blocked by site policy</span>
-            <span class="status" id="status-wordle">attempting embed…</span>
+  <!-- Main Content -->
+  <main class="main-container">
+    <div class="dashboard-grid">
+      <!-- Wordle Game Card -->
+      <div class="game-card" id="wordle-card">
+        <div class="card-header">
+          <div class="card-title">
+            🎯 Wordle
+            <span class="status-badge status-loading" id="wordle-status">
+              <div class="spinner"></div>
+              Loading
+            </span>
           </div>
-        </header>
-        <iframe id="iframe-wordle" class="app" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox" title="Wordle"></iframe>
-        <div class="fallback">If you see nothing above, the site forbids embedding (X‑Frame‑Options / CSP). Use the button to play in a new tab. No tracking here, promise.</div>
-      </article>
-
-      <!-- Globle card -->
-      <article class="card" id="card-globle">
-        <header>
-          <div class="title">Globle</div>
-          <div class="controls">
-            <button class="btn" onclick="openExternal('https://globle-game.com/game')">Open in new tab</button>
-            <span class="pill">Embeds may be blocked by site policy</span>
-            <span class="status" id="status-globle">attempting embed…</span>
+          <div class="card-subtitle">Daily word puzzle from The New York Times</div>
+          <div class="card-controls">
+            <button class="btn btn-primary" onclick="refreshWordle()">
+              🔄 Refresh
+            </button>
+            <a class="btn btn-secondary" href="https://www.nytimes.com/games/wordle/index.html" target="_blank">
+              🔗 Open Direct
+            </a>
           </div>
-        </header>
-        <iframe id="iframe-globle" class="app" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox" title="Globle"></iframe>
-        <div class="fallback">If the game doesn't appear, Globle likely blocks iframes. Use the button to pop it out.</div>
-      </article>
+        </div>
+        <iframe 
+          id="wordle-frame" 
+          class="game-frame" 
+          src="https://www.nytimes.com/games/wordle/index.html" 
+          title="Wordle Game"
+          loading="lazy">
+        </iframe>
+        <div class="fallback-message">
+          <h3>Unable to load Wordle</h3>
+          <p>The game might be blocked by your browser or network settings.</p>
+          <a class="btn btn-primary" href="https://www.nytimes.com/games/wordle/index.html" target="_blank">
+            Open Wordle Directly
+          </a>
+        </div>
+      </div>
 
-      <!-- JSON‑RPC card -->
-      <article class="card" id="card-rpc" style="grid-column: span 12;">
-        <header>
-          <div class="title">JSON‑RPC Viewer</div>
-          <div class="controls">
-            <span class="pill">Options: URL · Paste · Upload · Demo</span>
-            <span class="status" id="status-rpc">idle</span>
+      <!-- Globle Game Card -->
+      <div class="game-card" id="globle-card">
+        <div class="card-header">
+          <div class="card-title">
+            🌍 Globle
+            <span class="status-badge status-loading" id="globle-status">
+              <div class="spinner"></div>
+              Loading
+            </span>
           </div>
-        </header>
-
-        <div class="rpc-toolbar">
-          <input id="rpc-url" type="url" placeholder="Enter JSON or JSON‑RPC endpoint URL (https://…)" />
-          <button class="btn" onclick="loadFromUrl()">Fetch URL</button>
-          <button class="btn secondary" onclick="loadFromPaste()">Parse Pasted JSON</button>
-          <label class="btn secondary" for="rpc-file">Upload .json / .rtf</label>
-          <input id="rpc-file" type="file" accept=".json,.txt,.rtf,.log,.md" hidden />
-          <button class="btn good" onclick="loadDemo()">Load Demo</button>
+          <div class="card-subtitle">Daily geography guessing game</div>
+          <div class="card-controls">
+            <button class="btn btn-primary" onclick="refreshGlobe()">
+              🔄 Refresh
+            </button>
+            <a class="btn btn-secondary" href="https://globle-game.com/" target="_blank">
+              🔗 Open Direct
+            </a>
+          </div>
         </div>
-
-        <div class="rpc-wrap">
-          <section class="rpc-pane">
-            <h3 style="margin:6px 6px 10px 6px; font-size:14px;">Parsed Summary</h3>
-            <div id="summary" class="kv"></div>
-          </section>
-          <section class="rpc-pane">
-            <h3 style="margin:6px 6px 10px 6px; font-size:14px;">Raw JSON</h3>
-            <textarea id="rpc-raw" spellcheck="false" placeholder="Paste JSON here if you want to parse manually…"></textarea>
-          </section>
+        <iframe 
+          id="globle-frame" 
+          class="game-frame" 
+          src="https://globle-game.com/" 
+          title="Globle Game"
+          loading="lazy">
+        </iframe>
+        <div class="fallback-message">
+          <h3>Unable to load Globle</h3>
+          <p>The game might be blocked by your browser or network settings.</p>
+          <a class="btn btn-primary" href="https://globle-game.com/" target="_blank">
+            Open Globle Directly
+          </a>
         </div>
+      </div>
 
-        <div class="rpc-wrap" style="grid-template-columns: 1fr;">
-          <section class="rpc-pane" style="min-height: 260px;">
-            <h3 style="margin:6px 6px 10px 6px; font-size:14px;">HTML Content (sandboxed)</h3>
-            <iframe id="rpc-content" title="RPC HTML Content" sandbox="allow-same-origin" style="width:100%;height:400px;border:0;background:#0b0f17;"></iframe>
-          </section>
+      <!-- Daily Gazette Card -->
+      <div class="gazette-card">
+        <div class="card-header">
+          <div class="card-title">
+            📰 Daily Gazette
+            <span class="status-badge status-loading" id="gazette-status">
+              <div class="spinner"></div>
+              Fetching
+            </span>
+          </div>
+          <div class="card-subtitle">Automatically fetched daily news and updates</div>
+          <div class="card-controls">
+            <button class="btn btn-primary" onclick="fetchGazette()">
+              🔄 Refresh Gazette
+            </button>
+            <button class="btn btn-secondary" onclick="toggleGazetteView()">
+              👁️ Toggle View
+            </button>
+          </div>
         </div>
-
-        <div class="foot">
-          <div>Tip: Many third‑party sites block iframes and/or CORS. This page gracefully falls back to opening in a new tab, and the RPC viewer supports paste/upload.</div>
-          <div class="links"><a href="https://github.io" target="_blank" rel="noopener">GitHub Pages</a></div>
+        
+        <div class="gazette-content">
+          <div class="gazette-toolbar">
+            <input 
+              type="url" 
+              id="gazette-url" 
+              class="input-field" 
+              placeholder="Enter JSON-RPC URL (auto-fetches on load)..."
+              value=""
+            />
+            <button class="btn btn-primary" onclick="fetchFromCustomUrl()">
+              🌐 Fetch Custom
+            </button>
+          </div>
+          
+          <div class="gazette-viewer">
+            <div class="gazette-panel">
+              <div class="panel-header">📋 Raw JSON Response</div>
+              <div class="panel-content">
+                <pre id="json-raw-content">Waiting for data...</pre>
+              </div>
+            </div>
+            
+            <div class="gazette-panel">
+              <div class="panel-header">📊 Parsed Data</div>
+              <div class="panel-content">
+                <div id="json-parsed-content">No data parsed yet</div>
+              </div>
+            </div>
+            
+            <div class="gazette-html-viewer">
+              <div class="panel-header">📄 HTML Content Preview</div>
+              <iframe 
+                id="gazette-html-frame" 
+                class="gazette-html-content"
+                title="Gazette HTML Content"
+                sandbox="allow-same-origin allow-scripts">
+              </iframe>
+            </div>
+          </div>
         </div>
-      </article>
-    </section>
+      </div>
+    </div>
   </main>
 
   <script>
-    // ---- Try to embed Wordle & Globle, but be ready for frame bans.
-    function tryEmbed(cardId, iframeId, url, statusId) {
-      const card = document.getElementById(cardId);
-      const frame = document.getElementById(iframeId);
-      const status = document.getElementById(statusId);
-      status.textContent = 'attempting embed…';
-      let done = false;
-
-      const timer = setTimeout(() => {
-        if (!done) {
-          card.classList.add('err');
-          status.textContent = 'embed likely blocked → use new tab';
-        }
-      }, 4500);
-
-      frame.onload = () => { done = true; clearTimeout(timer); status.textContent = 'embedded'; };
-      // Always attempt; if site blocks, timeout flips UI.
-      frame.src = url;
-    }
-
-    function openExternal(url) { window.open(url, '_blank', 'noopener'); }
-
-    tryEmbed('card-wordle','iframe-wordle','https://www.nytimes.com/games/wordle/index.html','status-wordle');
-    tryEmbed('card-globle','iframe-globle','https://globle-game.com/game','status-globle');
-
-    // ---- JSON‑RPC viewer
-    const fileInput = document.getElementById('rpc-file');
-    fileInput.addEventListener('change', async (e) => {
-      const f = e.target.files?.[0]; if (!f) return;
-      setRpcStatus('reading file…');
-      const text = await f.text();
-      if (!parseAndRender(text)) {
-        alert('Could not parse JSON. If the file is an RTF with JSON inside, I will try to extract the first {...} block automatically when you click OK.');
-        const extracted = extractJsonFromText(text);
-        if (!parseAndRender(extracted)) {
-          setRpcStatus('parse failed');
-          alert('Still could not parse as JSON. Paste the JSON manually into the Raw JSON box.');
-        }
-      }
-    });
-
-    function setRpcStatus(msg) { document.getElementById('status-rpc').textContent = msg; }
-
-    async function loadFromUrl() {
-      const url = document.getElementById('rpc-url').value.trim();
-      if (!url) { alert('Enter a URL first.'); return; }
-      setRpcStatus('fetching…');
-      try {
-        const res = await fetch(url, { mode: 'cors' });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const text = await res.text();
-        if (!parseAndRender(text)) {
-          // Some endpoints return JSON with text/html content-type; try to extract
-          const extracted = extractJsonFromText(text);
-          if (!parseAndRender(extracted)) throw new Error('Invalid JSON');
-        }
-      } catch (err) {
-        console.error(err);
-        setRpcStatus('fetch/CORS blocked or invalid JSON');
-        alert('Could not fetch or parse (CORS or invalid JSON). Paste JSON, upload a file, or use Demo.');
-      }
-    }
-
-    function loadFromPaste() {
-      const text = document.getElementById('rpc-raw').value.trim();
-      if (!text) { alert('Paste JSON into the Raw JSON box first.'); return; }
-      parseAndRender(text) || alert('That did not parse as JSON.');
-    }
-
-    function extractJsonFromText(text) {
-      const first = text.indexOf('{'); const last = text.lastIndexOf('}');
-      return (first >= 0 && last >= 0 && last > first) ? text.slice(first, last + 1) : text;
-    }
-
-    function parseAndRender(text) {
-      try {
-        const json = JSON.parse(text);
-        document.getElementById('rpc-raw').value = JSON.stringify(json, null, 2);
-        renderSummary(json);
-        setRpcStatus('parsed');
-        return true;
-      } catch (e) {
-        return false;
-      }
-    }
-
-    function renderSummary(obj) {
-      // A generic JSON‑RPC shape with result.gazette properties (safe if absent)
-      const g = obj?.result?.gazette ?? {};
-      const kv = [
-        ['id', obj?.id ?? '—'],
-        ['gazetteId', g.gazetteId ?? '—'],
-        ['schoolId', g.schoolId ?? '—'],
-        ['header', g.header ?? '—'],
-        ['publishedDate', millisToDate(g.publishedDate)],
-        ['gazetteDate', millisToDate(g.gazetteDate)],
-        ['createdBy', g.createdBy ?? '—'],
-        ['lastUpdatedBy', g.lastUpdatedBy ?? '—'],
-        ['attachments', Array.isArray(g.attachments) ? g.attachments.length : '—'],
-        ['isPublished', String(g.isPublished ?? '—')],
-      ];
-      const root = document.getElementById('summary');
-      root.innerHTML = kv.map(([k,v]) => `<div>${escapeHtml(k)}</div><div>${escapeHtml(String(v))}</div>`).join('');
-
-      // Render HTML safely into a sandboxed iframe using srcdoc
-      const content = g.content ?? '';
-      const frame = document.getElementById('rpc-content');
-      const doc = `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="dark light"><style>
-        body{font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; line-height:1.4; padding: 12px; background:#0b0f17; color:#e7eef7}
-        a{color:#7fb0ff}
-        table{border-collapse:collapse}
-        td,th{border:1px solid #334a7a; padding:6px}
-      </style></head><body>${content}</body></html>`;
-      frame.srcdoc = doc;
-    }
-
-    function millisToDate(ms) {
-      if (!ms || isNaN(ms)) return '—';
-      try {
-        const d = new Date(Number(ms));
-        return d.toLocaleString([], { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-      } catch { return '—'; }
-    }
-
-    function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
-
-    // Demo payload embedded (structure similar to user sample)
-    const DEMO_JSON = {
-      "id": 3,
-      "result": {
-        "gazette": {
-          "gazetteId": 5950,
-          "schoolId": 2,
-          "header": "HS Gazette — Tuesday, 26 August 2025",
-          "publishedDate": 1756109334000,
-          "unread": false,
-          "gazetteDate": 1756137600000,
-          "createdBy": "GOH Li San Maureen",
-          "createdOn": 1756109330000,
-          "lastUpdatedBy": "GOH Li San Maureen",
-          "lastUpdatedOn": 1756109334000,
-          "publishedBy": "GOH Li San Maureen",
-          "publishedOn": 1756109334000,
-          "content": "<div><p style=\"text-align:center\"><strong><span style=\"font-size:20pt\">High School Gazette</span></strong></p><p>Sample demo content. Replace by fetching your real endpoint, or paste JSON above.</p></div>",
-          "attachments": [],
-          "isPublished": true
-        }
-      }
+    // Global state management
+    const AppState = {
+      gazetteData: null,
+      gazetteUrl: '', // Will be set based on user's network analysis
+      autoFetchEnabled: true,
+      viewMode: 'split' // 'split', 'html-only', 'data-only'
     };
 
-    function loadDemo() {
-      setRpcStatus('loading demo…');
-      parseAndRender(JSON.stringify(DEMO_JSON));
+    // Utility functions
+    function updateStatus(elementId, status, type = 'loading') {
+      const element = document.getElementById(elementId);
+      if (!element) return;
+      
+      const statusClasses = {
+        loading: 'status-loading',
+        success: 'status-success',
+        error: 'status-error'
+      };
+      
+      // Remove all status classes
+      Object.values(statusClasses).forEach(cls => element.classList.remove(cls));
+      
+      // Add new status class
+      element.classList.add(statusClasses[type] || 'status-loading');
+      
+      // Update content
+      const spinner = type === 'loading' ? '<div class="spinner"></div>' : '';
+      element.innerHTML = `${spinner}${status}`;
     }
 
-    // Optional: if you want to auto‑load from a known endpoint on first visit,
-    // you can set localStorage.RPC_URL and uncomment the lines below.
-    // const bootUrl = localStorage.getItem('RPC_URL');
-    // if (bootUrl) { document.getElementById('rpc-url').value = bootUrl; loadFromUrl(); }
+    function showError(message, elementId = null) {
+      console.error('App Error:', message);
+      if (elementId) {
+        updateStatus(elementId, `Error: ${message}`, 'error');
+      }
+    }
+
+    function formatJsonForDisplay(data) {
+      return JSON.stringify(data, null, 2);
+    }
+
+    // Game iframe management
+    function setupGameIframe(iframeId, cardId, gameName) {
+      const iframe = document.getElementById(iframeId);
+      const card = document.getElementById(cardId);
+      const statusId = `${gameName.toLowerCase()}-status`;
+      
+      if (!iframe || !card) return;
+
+      // Set loading state
+      updateStatus(statusId, 'Loading', 'loading');
+      
+      // Success handler
+      iframe.onload = () => {
+        setTimeout(() => {
+          try {
+            // Try to access iframe content to check if it loaded properly
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (iframeDoc && iframeDoc.body && iframeDoc.body.innerHTML.trim()) {
+              updateStatus(statusId, 'Loaded', 'success');
+              card.classList.remove('error');
+            } else {
+              throw new Error('Empty content');
+            }
+          } catch (e) {
+            // Cross-origin or blocked content
+            updateStatus(statusId, 'Loaded (External)', 'success');
+            card.classList.remove('error');
+          }
+        }, 2000);
+      };
+      
+      // Error handler
+      iframe.onerror = () => {
+        updateStatus(statusId, 'Failed to Load', 'error');
+        card.classList.add('error');
+      };
+      
+      // Timeout fallback
+      setTimeout(() => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+          if (!iframeDoc) {
+            updateStatus(statusId, 'Blocked by CORS', 'error');
+            card.classList.add('error');
+          }
+        } catch (e) {
+          // This is actually normal for cross-origin iframes
+          updateStatus(statusId, 'Loaded (External)', 'success');
+        }
+      }, 8000);
+    }
+
+    // Game refresh functions
+    function refreshWordle() {
+      const iframe = document.getElementById('wordle-frame');
+      const card = document.getElementById('wordle-card');
+      
+      updateStatus('wordle-status', 'Refreshing', 'loading');
+      card.classList.remove('error');
+      
+      // Force reload
+      iframe.src = iframe.src;
+    }
+
+    function refreshGlobe() {
+      const iframe = document.getElementById('globle-frame');
+      const card = document.getElementById('globle-card');
+      
+      updateStatus('globle-status', 'Refreshing', 'loading');
+      card.classList.remove('error');
+      
+      // Force reload
+      iframe.src = iframe.src;
+    }
+
+    // JSON-RPC and Gazette functionality
+    async function fetchJsonRpc(url, options = {}) {
+      const defaultOptions = {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json, text/html, */*',
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors',
+        cache: 'no-cache'
+      };
+      
+      const fetchOptions = { ...defaultOptions, ...options };
+      
+      try {
+        const response = await fetch(url, fetchOptions);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const contentType = response.headers.get('content-type') || '';
+        let data;
+        
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          // Try to parse as JSON first
+          try {
+            data = JSON.parse(text);
+          } catch {
+            // If not JSON, treat as HTML content
+            data = {
+              html: text,
+              contentType: contentType,
+              timestamp: new Date().toISOString()
+            };
+          }
+        }
+        
+        return data;
+      } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
+    }
+
+    function displayGazetteData(data) {
+      // Update raw JSON display
+      const rawContent = document.getElementById('json-raw-content');
+      if (rawContent) {
+        rawContent.textContent = formatJsonForDisplay(data);
+      }
+      
+      // Update parsed data display
+      const parsedContent = document.getElementById('json-parsed-content');
+      if (parsedContent) {
+        let parsedHtml = '<div class="parsed-data">';
+        
+        if (data.result) {
+          parsedHtml += `<h4>Result Data:</h4>`;
+          parsedHtml += `<pre>${formatJsonForDisplay(data.result)}</pre>`;
+        }
+        
+        if (data.error) {
+          parsedHtml += `<h4 style="color: var(--error);">Error:</h4>`;
+          parsedHtml += `<pre style="color: var(--error);">${formatJsonForDisplay(data.error)}</pre>`;
+        }
+        
+        if (data.method) {
+          parsedHtml += `<p><strong>Method:</strong> ${data.method}</p>`;
+        }
+        
+        if (data.id) {
+          parsedHtml += `<p><strong>ID:</strong> ${data.id}</p>`;
+        }
+        
+        parsedHtml += '</div>';
+        parsedContent.innerHTML = parsedHtml;
+      }
+      
+      // Update HTML content display
+      displayGazetteHtml(data);
+    }
+
+    function displayGazetteHtml(data) {
+      const iframe = document.getElementById('gazette-html-frame');
+      if (!iframe) return;
+      
+      let htmlContent = '';
+      
+      // Extract HTML content from various possible locations
+      if (data.html) {
+        htmlContent = data.html;
+      } else if (data.result && data.result.html) {
+        htmlContent = data.result.html;
+      } else if (data.result && typeof data.result === 'string' && data.result.includes('<')) {
+        htmlContent = data.result;
+      } else if (typeof data === 'string' && data.includes('<')) {
+        htmlContent = data;
+      }
+      
+      if (htmlContent) {
+        // Create a blob URL for the HTML content
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        iframe.src = URL.createObjectURL(blob);
+      } else {
+        // Show a message if no HTML content is found
+        const noContentHtml = `
+          <html>
+            <head>
+              <style>
+                body { 
+                  font-family: system-ui, sans-serif; 
+                  padding: 2rem; 
+                  text-align: center; 
+                  color: #666; 
+                  background: #f8f9fa;
+                }
+                .message { 
+                  background: white; 
+                  padding: 2rem; 
+                  border-radius: 8px; 
+                  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                  max-width: 400px;
+                  margin: 0 auto;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="message">
+                <h3>📄 No HTML Content</h3>
+                <p>The JSON-RPC response doesn't contain HTML content to display.</p>
+                <p>Check the raw JSON and parsed data panels for available information.</p>
+              </div>
+            </body>
+          </html>
+        `;
+        const blob = new Blob([noContentHtml], { type: 'text/html' });
+        iframe.src = URL.createObjectURL(blob);
+      }
+    }
+
+    async function fetchGazette() {
+      const url = document.getElementById('gazette-url').value.trim() || AppState.gazetteUrl;
+      
+      if (!url) {
+        showError('No gazette URL configured', 'gazette-status');
+        return;
+      }
+      
+      updateStatus('gazette-status', 'Fetching', 'loading');
+      
+      try {
+        const data = await fetchJsonRpc(url);
+        AppState.gazetteData = data;
+        displayGazetteData(data);
+        updateStatus('gazette-status', 'Updated', 'success');
+      } catch (error) {
+        showError(error.message, 'gazette-status');
+        
+        // Show demo data on error for development
+        if (AppState.autoFetchEnabled) {
+          console.log('Falling back to demo data...');
+          loadDemoGazette();
+        }
+      }
+    }
+
+    function fetchFromCustomUrl() {
+      const url = document.getElementById('gazette-url').value.trim();
+      if (!url) {
+        showError('Please enter a URL', 'gazette-status');
+        return;
+      }
+      
+      AppState.gazetteUrl = url;
+      fetchGazette();
+    }
+
+    function toggleGazetteView() {
+      const viewer = document.querySelector('.gazette-viewer');
+      if (!viewer) return;
+      
+      const modes = ['split', 'html-only', 'data-only'];
+      const currentIndex = modes.indexOf(AppState.viewMode);
+      const nextIndex = (currentIndex + 1) % modes.length;
+      AppState.viewMode = modes[nextIndex];
+      
+      // Apply view mode styles
+      viewer.className = `gazette-viewer view-${AppState.viewMode}`;
+      
+      // Update button text
+      const button = document.querySelector('[onclick="toggleGazetteView()"]');
+      if (button) {
+        const modeNames = {
+          'split': '👁️ Split View',
+          'html-only': '📄 HTML Only',
+          'data-only': '📊 Data Only'
+        };
+        button.innerHTML = modeNames[AppState.viewMode];
+      }
+    }
+
+    function loadDemoGazette() {
+      const demoData = {
+        "jsonrpc": "2.0",
+        "id": "gazette-demo-" + Date.now(),
+        "result": {
+          "title": "Daily Tech Gazette - Demo",
+          "date": new Date().toISOString().split('T')[0],
+          "timestamp": new Date().toISOString(),
+          "articles": [
+            {
+              "id": 1,
+              "headline": "AI Development Trends 2024",
+              "summary": "Latest developments in artificial intelligence continue to reshape technology landscapes.",
+              "category": "Technology"
+            },
+            {
+              "id": 2,
+              "headline": "Web Performance Optimization",
+              "summary": "New techniques for improving web application performance and user experience.",
+              "category": "Web Development"
+            },
+            {
+              "id": 3,
+              "headline": "Cybersecurity Updates",
+              "summary": "Important security patches and best practices for modern applications.",
+              "category": "Security"
+            }
+          ]
+        },
+        "html": `
+          <!DOCTYPE html>
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Daily Tech Gazette</title>
+              <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { 
+                  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                  line-height: 1.6; 
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  min-height: 100vh;
+                  padding: 20px;
+                }
+                .container {
+                  max-width: 800px;
+                  margin: 0 auto;
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                  overflow: hidden;
+                }
+                .header {
+                  background: linear-gradient(135deg, #2c3e50, #34495e);
+                  color: white;
+                  padding: 2rem;
+                  text-align: center;
+                }
+                .header h1 {
+                  font-size: 2.5rem;
+                  margin-bottom: 0.5rem;
+                  font-weight: 300;
+                }
+                .header p {
+                  opacity: 0.9;
+                  font-size: 1.1rem;
+                }
+                .date {
+                  background: #ecf0f1;
+                  padding: 1rem;
+                  text-align: center;
+                  color: #7f8c8d;
+                  font-weight: 500;
+                }
+                .content {
+                  padding: 2rem;
+                }
+                .article {
+                  background: #f8f9fa;
+                  margin: 1.5rem 0;
+                  padding: 1.5rem;
+                  border-radius: 8px;
+                  border-left: 4px solid #3498db;
+                  transition: transform 0.2s ease, box-shadow 0.2s ease;
+                }
+                .article:hover {
+                  transform: translateY(-2px);
+                  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                }
+                .article .category {
+                  display: inline-block;
+                  background: #3498db;
+                  color: white;
+                  padding: 0.25rem 0.75rem;
+                  border-radius: 20px;
+                  font-size: 0.8rem;
+                  font-weight: 500;
+                  margin-bottom: 1rem;
+                }
+                .article .headline {
+                  font-size: 1.4rem;
+                  font-weight: 600;
+                  color: #2c3e50;
+                  margin-bottom: 0.75rem;
+                }
+                .article .summary {
+                  color: #5a6c7d;
+                  font-size: 1rem;
+                  line-height: 1.6;
+                }
+                .footer {
+                  background: #2c3e50;
+                  color: white;
+                  padding: 1.5rem;
+                  text-align: center;
+                  font-size: 0.9rem;
+                }
+                @media (max-width: 600px) {
+                  body { padding: 10px; }
+                  .header h1 { font-size: 2rem; }
+                  .content { padding: 1rem; }
+                  .article { padding: 1rem; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>📰 Daily Tech Gazette</h1>
+                  <p>Your daily dose of technology news and insights</p>
+                </div>
+                <div class="date">
+                  📅 ${new Date().toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </div>
+                <div class="content">
+                  <div class="article">
+                    <div class="category">Technology</div>
+                    <div class="headline">🤖 AI Development Trends 2024</div>
+                    <div class="summary">
+                      Artificial intelligence continues to evolve at an unprecedented pace. From large language models to 
+                      computer vision breakthroughs, the latest developments are reshaping how we interact with technology 
+                      and opening new possibilities for innovation across industries.
+                    </div>
+                  </div>
+                  <div class="article">
+                    <div class="category">Web Development</div>
+                    <div class="headline">⚡ Web Performance Optimization</div>
+                    <div class="summary">
+                      Modern web applications demand exceptional performance. New techniques in code splitting, lazy loading, 
+                      and edge computing are enabling developers to create faster, more responsive user experiences while 
+                      maintaining rich functionality.
+                    </div>
+                  </div>
+                  <div class="article">
+                    <div class="category">Security</div>
+                    <div class="headline">🔒 Cybersecurity Updates</div>
+                    <div class="summary">
+                      As digital threats evolve, staying ahead of security vulnerabilities is crucial. Recent patches and 
+                      best practices focus on zero-trust architectures, enhanced authentication methods, and proactive 
+                      threat detection systems.
+                    </div>
+                  </div>
+                </div>
+                <div class="footer">
+                  <p>🚀 Powered by Daily Hub | Auto-updated via JSON-RPC</p>
+                </div>
+              </div>
+            </body>
+          </html>
+        `
+      };
+      
+      AppState.gazetteData = demoData;
+      displayGazetteData(demoData);
+      updateStatus('gazette-status', 'Demo Loaded', 'success');
+    }
+
+    // Initialize application
+    function initializeApp() {
+      console.log('🚀 Initializing Daily Hub...');
+      
+      // Setup game iframes
+      setupGameIframe('wordle-frame', 'wordle-card', 'Wordle');
+      setupGameIframe('globle-frame', 'globle-card', 'Globle');
+      
+      // Auto-fetch gazette data
+      setTimeout(() => {
+        if (AppState.autoFetchEnabled) {
+          console.log('📰 Auto-fetching gazette data...');
+          // For demo purposes, load demo data
+          // In production, this would use the actual JSON-RPC endpoint
+          loadDemoGazette();
+        }
+      }, 2000);
+      
+      console.log('✅ Daily Hub initialized successfully');
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', initializeApp);
+    
+    // Make functions globally available
+    window.refreshWordle = refreshWordle;
+    window.refreshGlobe = refreshGlobe;
+    window.fetchGazette = fetchGazette;
+    window.fetchFromCustomUrl = fetchFromCustomUrl;
+    window.toggleGazetteView = toggleGazetteView;
   </script>
 </body>
 </html>
